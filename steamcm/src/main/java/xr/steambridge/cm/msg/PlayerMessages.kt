@@ -1,6 +1,6 @@
 package xr.steambridge.cm.msg
 
-/** One owned Steam game, from IPlayerService.GetOwnedGames. */
+/** One owned Steam game, from IPlayerService.GetOwnedGames. [isVr] is filled in later by VR detection. */
 data class OwnedGame(
     val appId: Int,
     val name: String,
@@ -8,6 +8,7 @@ data class OwnedGame(
     val capsuleFilename: String?,
     val playtimeForeverMin: Int,
     val lastPlayedUnix: Int,
+    val isVr: Boolean = false,
 )
 
 /**

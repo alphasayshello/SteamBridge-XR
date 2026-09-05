@@ -42,7 +42,11 @@ class AppTicketService(
         )
         val resp = withTimeout(timeoutMs) { response.await() }
         if (resp.eResult != EResult.OK) {
-            val note = if (resp.eResult == EResult.LimitExceeded) " (rate-limited ~1/min)" else ""
+            val note = when (resp.eResult) {
+                EResult.LimitExceeded -> " (rate-limited ~1/min)"
+                EResult.AccessDenied -> " (account may not own this app)"
+                else -> ""
+            }
             throw IllegalStateException("RequestEncryptedAppTicket eresult=${resp.eResult}$note")
         }
         if (resp.encryptedAppTicket.isEmpty()) {

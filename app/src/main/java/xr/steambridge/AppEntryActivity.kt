@@ -23,12 +23,14 @@ class AppEntryActivity : ComponentActivity() {
                     val library by vm.library.collectAsState()
                     val libraryLoading by vm.libraryLoading.collectAsState()
                     val activeAppId by vm.activeAppId.collectAsState()
+                    val relayStatus by vm.relayStatus.collectAsState()
                     BridgeScreen(
                         state = state,
                         logs = logs,
                         library = library,
                         libraryLoading = libraryLoading,
                         activeAppId = activeAppId,
+                        relayStatus = relayStatus,
                         onLoginQr = vm::loginWithQr,
                         onLogout = vm::logout,
                         onStartApp = vm::startApp,

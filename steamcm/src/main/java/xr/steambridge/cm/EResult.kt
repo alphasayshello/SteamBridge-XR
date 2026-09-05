@@ -9,6 +9,7 @@ object EResult {
     const val InvalidPassword = 5
     const val LoggedInElsewhere = 6
     const val InvalidProtocolVer = 7
+    const val AccessDenied = 15                // ticket path: the account doesn't own the app
     const val Timeout = 16
     const val LimitExceeded = 25
     const val AccountLogonDenied = 63          // Steam Guard email code required

@@ -29,7 +29,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +48,7 @@ import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import xr.steambridge.R
+import xr.steambridge.RelayStatus
 import xr.steambridge.UiState
 import xr.steambridge.cm.msg.OwnedGame
 
@@ -55,6 +59,7 @@ fun BridgeScreen(
     library: List<OwnedGame>,
     libraryLoading: Boolean,
     activeAppId: Int,
+    relayStatus: RelayStatus.State,
     onLoginQr: () -> Unit,
     onLogout: () -> Unit,
     onStartApp: (Int) -> Unit,
@@ -71,7 +76,7 @@ fun BridgeScreen(
         Header(state)
         Spacer(Modifier.height(14.dp))
         if (state is UiState.LoggedIn) {
-            LibraryView(state, library, libraryLoading, activeAppId, onStartApp, onStopRelay, onLogout, onRefresh, Modifier.weight(1f))
+            LibraryView(state, library, libraryLoading, activeAppId, relayStatus, onStartApp, onStopRelay, onLogout, onRefresh, Modifier.weight(1f))
         } else {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 LoginPanel {
@@ -120,6 +125,7 @@ private fun LibraryView(
     library: List<OwnedGame>,
     loading: Boolean,
     activeAppId: Int,
+    relayStatus: RelayStatus.State,
     onStartApp: (Int) -> Unit,
     onStopRelay: () -> Unit,
     onLogout: () -> Unit,
@@ -127,6 +133,17 @@ private fun LibraryView(
     modifier: Modifier,
 ) {
     val activeName = library.firstOrNull { it.appId == activeAppId }?.name?.ifEmpty { null }
+    val nameOf = { id: Int -> library.firstOrNull { it.appId == id }?.name?.ifEmpty { null } }
+    var query by remember { mutableStateOf("") }
+    // Library defaults to the VR filter (this is a VR headset); the All chip drops it.
+    var vrOnly by remember { mutableStateOf(true) }
+    val hasVr = remember(library) { library.any { it.isVr } }
+    val shown = remember(library, query, vrOnly) {
+        library.asSequence()
+            .filter { !vrOnly || it.isVr }
+            .filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+            .toList()
+    }
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(Modifier.size(30.dp).clip(RoundedCornerShape(3.dp)).background(Steam.Bg1), contentAlignment = Alignment.Center) {
@@ -148,23 +165,24 @@ private fun LibraryView(
             )
         }
         Spacer(Modifier.height(12.dp))
-        RelayBar(running = state.relayRunning, activeName = activeName, onStop = onStopRelay)
+        RelayBar(running = state.relayRunning, activeName = activeName, status = relayStatus, nameOf = nameOf, onStop = onStopRelay)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("LIBRARY", color = Steam.Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Spacer(Modifier.width(8.dp))
-            Text(if (library.isEmpty()) "" else "${library.size}", color = Steam.Faint, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Text(if (library.isEmpty()) "" else "${shown.size}", color = Steam.Faint, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
             Spacer(Modifier.weight(1f))
             if (loading) CircularProgressIndicator(Modifier.size(14.dp), color = Steam.BlueLt, strokeWidth = 2.dp)
         }
         Spacer(Modifier.height(10.dp))
+        SearchField(query, { query = it })
+        Spacer(Modifier.height(10.dp))
+        FilterChips(vrOnly, hasVr) { vrOnly = it }
+        Spacer(Modifier.height(12.dp))
         when {
-            library.isEmpty() && loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("Loading your library…", color = Steam.Muted, fontSize = 13.sp)
-            }
-            library.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("No games found.", color = Steam.Muted, fontSize = 13.sp)
-            }
+            library.isEmpty() && loading -> Centered("Loading your library…")
+            library.isEmpty() -> Centered("No games found.")
+            shown.isEmpty() -> Centered(if (vrOnly) "No VR apps found — tap All." else "No matches for \"$query\".")
             else -> LazyVerticalGrid(
                 // Adaptive so tiles re-flow into more/fewer columns as the panel is resized.
                 columns = GridCells.Adaptive(minSize = 128.dp),
@@ -173,8 +191,10 @@ private fun LibraryView(
                 contentPadding = PaddingValues(bottom = 8.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                items(library, key = { it.appId }) { game ->
-                    GameTile(game, active = game.appId == activeAppId && state.relayRunning) { onStartApp(game.appId) }
+                items(shown, key = { it.appId }) { game ->
+                    GameTile(game, tileStateFor(game.appId, activeAppId, state.relayRunning, relayStatus)) {
+                        onStartApp(game.appId)
+                    }
                 }
             }
         }
@@ -182,25 +202,103 @@ private fun LibraryView(
 }
 
 @Composable
-private fun RelayBar(running: Boolean, activeName: String?, onStop: () -> Unit) {
-    val accent = if (running) Steam.Green else Steam.Faint
+private fun androidx.compose.foundation.layout.ColumnScope.Centered(text: String) {
+    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+        Text(text, color = Steam.Muted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = query,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(color = Steam.Text, fontSize = 14.sp),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(Steam.BlueLt),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(Steam.Search)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        decorationBox = { inner ->
+            if (query.isEmpty()) Text("Search library", color = Steam.Faint, fontSize = 14.sp)
+            inner()
+        },
+    )
+}
+
+@Composable
+private fun FilterChips(vrOnly: Boolean, hasVr: Boolean, onChange: (Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Chip("All", selected = !vrOnly) { onChange(false) }
+        Chip(if (hasVr) "VR" else "VR (detecting…)", selected = vrOnly) { onChange(true) }
+    }
+}
+
+@Composable
+private fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        color = if (selected) Steam.White else Steam.Muted,
+        fontSize = 12.sp,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        modifier = Modifier
+            .clip(RoundedCornerShape(2.dp))
+            .background(if (selected) Steam.PanelHi else Steam.Bg1.copy(alpha = 0.5f))
+            .then(if (selected) Modifier.border(1.dp, Steam.Line, RoundedCornerShape(2.dp)) else Modifier)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    )
+}
+
+private data class RelayView(val accent: Color, val title: String, val sub: String, val spinner: Boolean)
+
+@Composable
+private fun RelayBar(
+    running: Boolean,
+    activeName: String?,
+    status: RelayStatus.State,
+    nameOf: (Int) -> String?,
+    onStop: () -> Unit,
+) {
+    // Mint status drives the display; fall back to the relay's running/stopped baseline.
+    val v = when (status) {
+        is RelayStatus.State.Minting ->
+            RelayView(Steam.BlueLt, "Minting ticket…", nameOf(status.appId) ?: "app ${status.appId}", spinner = true)
+        is RelayStatus.State.Ready ->
+            RelayView(Steam.Green, "Relay live", nameOf(status.appId) ?: activeName ?: "127.0.0.1:48010", spinner = false)
+        is RelayStatus.State.Failed -> {
+            val who = nameOf(status.appId)?.let { "$it — " } ?: ""
+            RelayView(
+                Steam.Danger,
+                if (status.notOwned) "Mint failed · not owned" else "Mint failed",
+                if (status.notOwned) "${who}this account doesn't own it" else who + status.reason,
+                spinner = false,
+            )
+        }
+        RelayStatus.State.Idle ->
+            if (running) RelayView(Steam.Green, "Relay live", activeName ?: "127.0.0.1:48010", spinner = false)
+            else RelayView(Steam.Faint, "Relay stopped", "Tap a game to start it", spinner = false)
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(3.dp))
             .background(Steam.Bg1.copy(alpha = 0.6f))
-            .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+            .border(1.dp, v.accent.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+        if (v.spinner) {
+            CircularProgressIndicator(Modifier.size(12.dp), color = v.accent, strokeWidth = 2.dp)
+        } else {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(v.accent))
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(if (running) "Relay live" else "Relay stopped", color = Steam.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                if (running) (activeName ?: "127.0.0.1:48010") else "Tap a game to start it",
-                color = Steam.Faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Text(v.title, color = Steam.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(v.sub, color = Steam.Faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (running) {
             Text(
@@ -216,40 +314,69 @@ private fun RelayBar(running: Boolean, activeName: String?, onStop: () -> Unit) 
     }
 }
 
+private enum class TileState { NONE, LIVE, MINTING, FAILED }
+
+/** The active tile mirrors the live mint status; every other tile is NONE. */
+private fun tileStateFor(appId: Int, activeAppId: Int, running: Boolean, status: RelayStatus.State): TileState {
+    if (appId != activeAppId) return TileState.NONE
+    return when {
+        status is RelayStatus.State.Failed && status.appId == appId -> TileState.FAILED
+        status is RelayStatus.State.Minting && status.appId == appId -> TileState.MINTING
+        running -> TileState.LIVE
+        else -> TileState.NONE
+    }
+}
+
 @Composable
-private fun GameTile(game: OwnedGame, active: Boolean, onClick: () -> Unit) {
+private fun GameTile(game: OwnedGame, tile: TileState, onClick: () -> Unit) {
+    val accent = when (tile) {
+        TileState.LIVE -> Steam.Green
+        TileState.MINTING -> Steam.BlueLt
+        TileState.FAILED -> Steam.Danger
+        TileState.NONE -> null
+    }
+    val badge = when (tile) {
+        TileState.LIVE -> "● LIVE"
+        TileState.MINTING -> "MINTING"
+        TileState.FAILED -> "FAILED"
+        TileState.NONE -> null
+    }
     Column(Modifier.clickable(onClick = onClick)) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.667f)
                 .clip(RoundedCornerShape(4.dp))
-                .then(if (active) Modifier.border(2.dp, Steam.Green, RoundedCornerShape(4.dp)) else Modifier),
+                .then(if (accent != null) Modifier.border(2.dp, accent, RoundedCornerShape(4.dp)) else Modifier),
         ) {
             CapsuleImage(game, Modifier.fillMaxSize())
-            if (active) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+            if (accent != null && badge != null) {
+                Text(
+                    badge,
+                    color = Steam.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(Steam.Green)
+                        .background(accent)
                         .padding(horizontal = 7.dp, vertical = 3.dp),
-                ) {
-                    Text("● LIVE", color = Steam.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                }
+                )
             }
         }
         Spacer(Modifier.height(6.dp))
         Text(
             game.name.ifEmpty { game.appId.toString() },
-            color = if (active) Steam.Green else Steam.Text,
+            color = accent ?: Steam.Text,
             fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium,
         )
         Text(
-            if (active) "Relay live" else "Tap to start",
-            color = Steam.Faint, fontSize = 10.sp,
+            when (tile) {
+                TileState.LIVE -> "Relay live"
+                TileState.MINTING -> "Minting ticket…"
+                TileState.FAILED -> "Mint failed"
+                TileState.NONE -> "Tap to start"
+            },
+            color = accent ?: Steam.Faint, fontSize = 10.sp,
         )
     }
 }

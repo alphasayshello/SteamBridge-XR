@@ -22,6 +22,7 @@ class BridgeViewModel(app: Application) : AndroidViewModel(app) {
     val library: StateFlow<List<OwnedGame>> = AuthController.library
     val libraryLoading: StateFlow<Boolean> = AuthController.libraryLoading
     val activeAppId: StateFlow<Int> = AuthController.activeAppId
+    val relayStatus: StateFlow<RelayStatus.State> = AuthController.relayStatus
 
     fun loginWithQr() = AuthController.loginWithQr()
     fun logout() = AuthController.logout()

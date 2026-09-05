@@ -7,6 +7,7 @@ import xr.steambridge.cm.msg.ClientHello
 import xr.steambridge.cm.msg.DeviceDetails
 import xr.steambridge.cm.msg.EMsg
 import xr.steambridge.cm.msg.GetOwnedGames
+import xr.steambridge.cm.msg.GetStoreItems
 import xr.steambridge.cm.msg.MachineId
 import xr.steambridge.cm.msg.MessageRouter
 import xr.steambridge.cm.msg.OwnedGame
@@ -98,13 +99,30 @@ class SteamBridgeClient(
         return MintResult(steamId64 = r.steamId.toULong(), personaName = accountName, ticket = ticket.bytes)
     }
 
-    /** Log on and pull the signed-in account's owned games (Steam library). */
+    /** Log on and pull the signed-in account's owned games (Steam library), tagged with VR support. */
     suspend fun fetchLibrary(accountName: String, refreshToken: String): List<OwnedGame> {
         val r = loggedOn(accountName, refreshToken)
         val resp = r.serviceCall(GetOwnedGames.METHOD, GetOwnedGames.request(r.steamId), authed = true)
         val games = GetOwnedGames.parse(resp.bodyBytes)
         onLog("library: ${games.size} owned games")
-        return games
+        val vr = fetchVrFlags(r, games.map { it.appId })
+        val tagged = games.map { it.copy(isVr = vr[it.appId] ?: false) }
+        onLog("VR: ${tagged.count { it.isVr }} of ${tagged.size} are VR-capable")
+        return tagged
+    }
+
+    /** Batch StoreBrowse.GetItems over the same authed connection to learn which appids are VR-capable. */
+    private suspend fun fetchVrFlags(r: MessageRouter, appIds: List<Int>): Map<Int, Boolean> {
+        val out = HashMap<Int, Boolean>()
+        for (chunk in appIds.chunked(GetStoreItems.MAX_IDS_PER_CALL)) {
+            try {
+                val resp = r.serviceCall(GetStoreItems.METHOD, GetStoreItems.request(chunk), authed = true)
+                out.putAll(GetStoreItems.parse(resp.bodyBytes))
+            } catch (e: Exception) {
+                onLog("VR flags: chunk of ${chunk.size} failed: ${e.message}")
+            }
+        }
+        return out
     }
 
     private suspend fun loggedOn(accountName: String, refreshToken: String): MessageRouter {

@@ -20,6 +20,7 @@ object Steam {
     val Panel = Color(0xFF1B2838)
     val PanelHi = Color(0xFF2A3F5A) // raised surface / inputs
     val Card = Color(0xFF1C5679)    // Steam "steel" card fill (art fallback tile)
+    val Search = Color(0xFF316282)  // Steam search/input field bg
     val Line = Color(0xFF316282)    // Steam's hairline blue
     val LineDim = Color(0xFF2A3B4E)
     val Blue = Color(0xFF1A9FFF)    // bright link blue

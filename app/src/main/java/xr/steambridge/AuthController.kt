@@ -38,6 +38,9 @@ object AuthController {
     private val _activeAppId = MutableStateFlow(3504270)
     val activeAppId: StateFlow<Int> = _activeAppId
 
+    /** Live mint status (minting / ready / failed), surfaced from the loopback service to the UI. */
+    val relayStatus: StateFlow<RelayStatus.State> = RelayStatus.state
+
     private var client: SteamBridgeClient? = null
     private var session: AuthSession? = null
     private var loginJob: Job? = null
@@ -85,6 +88,7 @@ object AuthController {
         session = null
         tokens.clearSession()
         _library.value = emptyList()
+        RelayStatus.idle()
         LogBus.log("Signed out")
         _ui.value = UiState.LoggedOut()
     }
@@ -95,6 +99,7 @@ object AuthController {
         _activeAppId.value = appId
         val name = _library.value.firstOrNull { it.appId == appId }?.name ?: appId.toString()
         LogBus.log("Starting relay for $name ($appId)")
+        RelayStatus.minting(appId)   // instant feedback; the service confirms ready/failed
         LoopbackServerService.switchApp(appContext, appId)
     }
 
@@ -106,6 +111,7 @@ object AuthController {
     /** Stop serving tickets — shuts the loopback relay down until the user starts an app again. */
     fun stopRelay() {
         LoopbackServerService.stop(appContext)
+        RelayStatus.idle()
         LogBus.log("Relay stopped")
         (_ui.value as? UiState.LoggedIn)?.let { _ui.value = it.copy(relayRunning = false) }
     }

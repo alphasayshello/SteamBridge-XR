@@ -28,10 +28,12 @@ class BridgeRepository(
             return null
         }
         val appId = tokens.activeAppId
+        RelayStatus.minting(appId)
         val client = SteamBridgeClient(scope = scope, machineSeed = tokens.machineSeed, onLog = LogBus::log)
         return try {
             val result = client.mintWithToken(account, refresh, appId)
             tokens.steamId64 = result.steamId64.toString()
+            RelayStatus.ready(appId, result.personaName)
             TicketCache.Entry(
                 steamId64 = result.steamId64,
                 personaName = result.personaName,
@@ -39,7 +41,10 @@ class BridgeRepository(
                 mintedAt = System.currentTimeMillis(),
             )
         } catch (e: Exception) {
-            LogBus.log("Mint failed: ${e.message}")
+            val msg = e.message ?: "unknown error"
+            LogBus.log("Mint failed: $msg")
+            // eresult 15 = AccessDenied → the signed-in account doesn't own this app.
+            RelayStatus.failed(appId, msg, notOwned = msg.contains("eresult=15"))
             null
         } finally {
             client.close()

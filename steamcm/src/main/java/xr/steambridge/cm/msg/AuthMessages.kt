@@ -107,6 +107,8 @@ object BeginAuthSessionViaCredentials {
         device: DeviceDetails,
         guardData: String? = null,
         persistence: Int = ESessionPersistence.Persistent,
+        // SteamClient sessions send website_id "Client" (field 8); SteamKit/node-steam-session always do.
+        websiteId: String = "Client",
     ): ByteArray = ProtoWriter().apply {
         string(1, device.friendlyName)
         string(2, accountName)
@@ -115,6 +117,7 @@ object BeginAuthSessionViaCredentials {
         bool(5, true) // remember_login
         varint(6, EAuthTokenPlatformType.SteamClient)
         varint(7, persistence)
+        string(8, websiteId)
         bytes(9, device.encode())
         guardData?.let { string(10, it) }
     }.toByteArray()

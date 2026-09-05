@@ -55,9 +55,13 @@ class AuthSession(
                 guardData = guardData,
             ),
         )
+        val beginHeader = ProtoHeader.decode(beginResp.headerBytes)
         val begin = BeginAuthSessionViaCredentials.parse(beginResp.bodyBytes)
         if (begin.clientId == 0L) {
-            return fail(begin.extendedError ?: "BeginAuthSession failed")
+            val reason = begin.extendedError?.takeIf { it.isNotBlank() }
+                ?: beginHeader.errorMessage?.takeIf { it.isNotBlank() }
+                ?: "eresult=${beginHeader.eResult}"
+            return fail("credentials rejected: $reason")
         }
         clientId = begin.clientId
         requestId = begin.requestId

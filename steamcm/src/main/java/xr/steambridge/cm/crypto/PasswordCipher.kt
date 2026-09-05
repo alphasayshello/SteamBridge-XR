@@ -1,9 +1,7 @@
 package xr.steambridge.cm.crypto
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.math.BigInteger
 import java.security.KeyFactory
-import java.security.Security
 import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import javax.crypto.Cipher
@@ -15,19 +13,13 @@ import javax.crypto.Cipher
  * and `publickey_exp`. The password (UTF-8 bytes) is encrypted RSA/ECB/PKCS1Padding and Base64'd, then
  * sent as `encrypted_password` alongside the matching `encryption_timestamp`.
  *
- * BouncyCastle is pinned as the provider: OEM JCE providers on Quest/Horizon OS differ in RSA padding
- * defaults and would silently produce a blob Steam rejects.
+ * We use the platform's DEFAULT JCE provider (AndroidOpenSSL / Conscrypt), which implements
+ * RSA/ECB/PKCS1Padding. We must NOT pin "BC": on Android P+ the bundled BouncyCastle no longer
+ * provides KeyFactory.RSA, and a same-named app copy can't register over the platform's, so
+ * getInstance("RSA","BC") hit the stripped platform provider and threw. The transformation is fully
+ * specified (PKCS#1 v1.5), so the default provider produces a blob Steam decrypts correctly.
  */
 object PasswordCipher {
-    private const val BC = BouncyCastleProvider.PROVIDER_NAME
-
-    init {
-        if (Security.getProvider(BC) == null) {
-            // insertProviderAt(_, 1) would shadow the platform provider globally; append instead and
-            // request BC explicitly per Cipher/KeyFactory so only our calls use it.
-            Security.addProvider(BouncyCastleProvider())
-        }
-    }
 
     /**
      * @param password     plaintext account password.
@@ -38,9 +30,9 @@ object PasswordCipher {
     fun encrypt(password: String, modulusHex: String, exponentHex: String): String {
         val modulus = BigInteger(1, hexToBytes(modulusHex))
         val exponent = BigInteger(1, hexToBytes(exponentHex))
-        val key = KeyFactory.getInstance("RSA", BC)
+        val key = KeyFactory.getInstance("RSA")
             .generatePublic(RSAPublicKeySpec(modulus, exponent))
-        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", BC)
+        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
         cipher.init(Cipher.ENCRYPT_MODE, key)
         val ct = cipher.doFinal(password.toByteArray(Charsets.UTF_8))
         return Base64.getEncoder().encodeToString(ct)

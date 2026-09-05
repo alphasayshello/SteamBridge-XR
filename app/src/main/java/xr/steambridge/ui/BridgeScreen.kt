@@ -166,7 +166,8 @@ private fun LibraryView(
                 Text("No games found.", color = Steam.Muted, fontSize = 13.sp)
             }
             else -> LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                // Adaptive so tiles re-flow into more/fewer columns as the panel is resized.
+                columns = GridCells.Adaptive(minSize = 128.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 8.dp),

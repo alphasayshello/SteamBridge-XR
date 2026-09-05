@@ -10,13 +10,15 @@
     <application
         android:allowBackup="false"
         android:label="SteamBridge-XR"
+        android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.SteamBridge">
 
         <activity
             android:name=".AppEntryActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

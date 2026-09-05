@@ -32,6 +32,8 @@ class AppEntryActivity : ComponentActivity() {
                         activeAppId = activeAppId,
                         relayStatus = relayStatus,
                         onLoginQr = vm::loginWithQr,
+                        onLoginCredentials = vm::loginWithCredentials,
+                        onSubmitGuardCode = vm::submitGuardCode,
                         onLogout = vm::logout,
                         onStartApp = vm::startApp,
                         onStopRelay = vm::stopRelay,

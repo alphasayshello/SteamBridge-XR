@@ -61,6 +61,8 @@ fun BridgeScreen(
     activeAppId: Int,
     relayStatus: RelayStatus.State,
     onLoginQr: () -> Unit,
+    onLoginCredentials: (String, String) -> Unit,
+    onSubmitGuardCode: (String) -> Unit,
     onLogout: () -> Unit,
     onStartApp: (Int) -> Unit,
     onStopRelay: () -> Unit,
@@ -81,9 +83,10 @@ fun BridgeScreen(
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 LoginPanel {
                     when (state) {
-                        is UiState.LoggedOut -> SignedOut(state.error, onLoginQr)
+                        is UiState.LoggedOut -> SignedOut(state.error, onLoginQr, onLoginCredentials)
                         is UiState.Working -> Busy(state.message)
                         is UiState.ShowQr -> QrView(state.challengeUrl)
+                        is UiState.GuardPrompt -> GuardCodeView(state.isDeviceCode, state.hint, onSubmitGuardCode)
                         else -> {}
                     }
                 }
@@ -437,29 +440,125 @@ private fun LoginPanel(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SignedOut(error: String?, onLoginQr: () -> Unit) {
+private fun SignedOut(error: String?, onLoginQr: () -> Unit, onLoginCredentials: (String, String) -> Unit) {
+    var byPassword by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Sign in", color = Steam.White, fontSize = 26.sp)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Use the Steam Mobile App to sign in\nwith a QR code — no password needed.",
-            color = Steam.Muted, fontSize = 13.sp,
-        )
-        Spacer(Modifier.height(22.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(3.dp))
-                .background(Steam.SignIn)
-                .clickable(onClick = onLoginQr)
-                .padding(vertical = 15.dp),
-            contentAlignment = Alignment.Center,
-        ) { Text("Sign in with QR code", color = Steam.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip("QR code", selected = !byPassword) { byPassword = false }
+            Chip("Password", selected = byPassword) { byPassword = true }
+        }
+        Spacer(Modifier.height(20.dp))
+        if (byPassword) {
+            CredentialForm(onSubmit = onLoginCredentials)
+        } else {
+            Text(
+                "Use the Steam Mobile App to sign in\nwith a QR code — no password needed.",
+                color = Steam.Muted, fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(20.dp))
+            PrimaryButton("Sign in with QR code", enabled = true, onClick = onLoginQr)
+        }
         if (error != null) {
             Spacer(Modifier.height(16.dp))
             Text(error, color = Steam.Danger, fontSize = 13.sp)
         }
     }
+}
+
+@Composable
+private fun CredentialForm(onSubmit: (String, String) -> Unit) {
+    var account by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        InputField(account, { account = it }, "Account name", password = false)
+        Spacer(Modifier.height(10.dp))
+        InputField(password, { password = it }, "Password", password = true)
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton(
+            "Sign in",
+            enabled = account.isNotBlank() && password.isNotEmpty(),
+        ) { onSubmit(account, password) }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Steam Guard asks for a code next if your account needs one.",
+            color = Steam.Faint, fontSize = 11.sp,
+        )
+    }
+}
+
+@Composable
+private fun GuardCodeView(isDeviceCode: Boolean, hint: String, onSubmit: (String) -> Unit) {
+    var code by remember { mutableStateOf("") }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Steam Guard", color = Steam.White, fontSize = 22.sp)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            if (isDeviceCode) "Enter the code from your Steam\nMobile authenticator app."
+            else if (hint.isNotBlank()) "Enter the code sent to $hint."
+            else "Enter the Steam Guard code sent to\nyour email.",
+            color = Steam.Muted, fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(18.dp))
+        InputField(code, { code = it }, "Code", password = false, numeric = true)
+        Spacer(Modifier.height(16.dp))
+        PrimaryButton("Verify", enabled = code.isNotBlank()) { onSubmit(code) }
+    }
+}
+
+@Composable
+private fun PrimaryButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(if (enabled) Steam.SignIn else androidx.compose.ui.graphics.SolidColor(Steam.PanelHi))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (enabled) Steam.White else Steam.Faint,
+            fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun InputField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    password: Boolean,
+    numeric: Boolean = false,
+) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(color = Steam.Text, fontSize = 15.sp),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(Steam.BlueLt),
+        visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation()
+        else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = when {
+                password -> androidx.compose.ui.text.input.KeyboardType.Password
+                numeric -> androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                else -> androidx.compose.ui.text.input.KeyboardType.Text
+            },
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(Steam.Search)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        decorationBox = { inner ->
+            if (value.isEmpty()) Text(placeholder, color = Steam.Faint, fontSize = 15.sp)
+            inner()
+        },
+    )
 }
 
 @Composable

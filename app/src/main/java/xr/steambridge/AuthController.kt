@@ -80,6 +80,39 @@ object AuthController {
         }
     }
 
+    fun loginWithCredentials(account: String, password: String) {
+        loginJob?.cancel()
+        pinProcess()
+        LogBus.log("Signing in as $account…")
+        _ui.value = UiState.Working("Reaching Steam…")
+        loginJob = scope.launch {
+            try {
+                val s = freshClient().openAuthSession()
+                session = s
+                observe(s)
+                finishAuth(s.loginWithCredentials(account.trim(), password, tokens.guardData))
+            } catch (e: Exception) {
+                LogBus.log("Sign-in failed: ${e.message}")
+                _ui.value = UiState.LoggedOut(e.message ?: "Sign-in failed")
+            }
+        }
+    }
+
+    /** Answer the Steam Guard prompt currently on screen. */
+    fun submitGuardCode(code: String) {
+        val s = session ?: return
+        val isDeviceCode = (_ui.value as? UiState.GuardPrompt)?.isDeviceCode ?: false
+        _ui.value = UiState.Working("Verifying code…")
+        scope.launch {
+            try {
+                s.submitGuardCode(code.trim(), isDeviceCode)
+            } catch (e: Exception) {
+                LogBus.log("Guard code failed: ${e.message}")
+                _ui.value = UiState.LoggedOut(e.message ?: "Guard code rejected")
+            }
+        }
+    }
+
     fun logout() {
         loginJob?.cancel()
         observerJob?.cancel()
@@ -152,6 +185,10 @@ object AuthController {
             s.state.collect { g ->
                 when (g) {
                     is GuardState.QrChallenge -> _ui.value = UiState.ShowQr(g.url)
+                    is GuardState.EmailCode -> _ui.value = UiState.GuardPrompt(isDeviceCode = false, hint = g.hint)
+                    is GuardState.DeviceCode -> _ui.value = UiState.GuardPrompt(isDeviceCode = true, hint = "")
+                    is GuardState.DeviceConfirmation ->
+                        _ui.value = UiState.Working("Approve the sign-in in your Steam Mobile app…")
                     is GuardState.Failed -> _ui.value = UiState.LoggedOut(g.reason)
                     else -> {}
                 }

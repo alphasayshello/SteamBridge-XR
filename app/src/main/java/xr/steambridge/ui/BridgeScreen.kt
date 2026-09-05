@@ -58,6 +58,7 @@ fun BridgeScreen(
     onLoginQr: () -> Unit,
     onLogout: () -> Unit,
     onStartApp: (Int) -> Unit,
+    onStopRelay: () -> Unit,
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -70,7 +71,7 @@ fun BridgeScreen(
         Header(state)
         Spacer(Modifier.height(14.dp))
         if (state is UiState.LoggedIn) {
-            LibraryView(state, library, libraryLoading, activeAppId, onStartApp, onLogout, onRefresh, Modifier.weight(1f))
+            LibraryView(state, library, libraryLoading, activeAppId, onStartApp, onStopRelay, onLogout, onRefresh, Modifier.weight(1f))
         } else {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 LoginPanel {
@@ -120,10 +121,12 @@ private fun LibraryView(
     loading: Boolean,
     activeAppId: Int,
     onStartApp: (Int) -> Unit,
+    onStopRelay: () -> Unit,
     onLogout: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier,
 ) {
+    val activeName = library.firstOrNull { it.appId == activeAppId }?.name?.ifEmpty { null }
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(Modifier.size(30.dp).clip(RoundedCornerShape(3.dp)).background(Steam.Bg1), contentAlignment = Alignment.Center) {
@@ -145,6 +148,8 @@ private fun LibraryView(
             )
         }
         Spacer(Modifier.height(12.dp))
+        RelayBar(running = state.relayRunning, activeName = activeName, onStop = onStopRelay)
+        Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("LIBRARY", color = Steam.Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Spacer(Modifier.width(8.dp))
@@ -171,6 +176,41 @@ private fun LibraryView(
                     GameTile(game, active = game.appId == activeAppId && state.relayRunning) { onStartApp(game.appId) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RelayBar(running: Boolean, activeName: String?, onStop: () -> Unit) {
+    val accent = if (running) Steam.Green else Steam.Faint
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(3.dp))
+            .background(Steam.Bg1.copy(alpha = 0.6f))
+            .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(if (running) "Relay live" else "Relay stopped", color = Steam.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (running) (activeName ?: "127.0.0.1:48010") else "Tap a game to start it",
+                color = Steam.Faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (running) {
+            Text(
+                "Stop",
+                color = Steam.Danger, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(2.dp))
+                    .border(1.dp, Steam.Danger.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                    .clickable(onClick = onStop)
+                    .padding(horizontal = 16.dp, vertical = 7.dp),
+            )
         }
     }
 }

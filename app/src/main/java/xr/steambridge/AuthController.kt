@@ -103,6 +103,13 @@ object AuthController {
         (_ui.value as? UiState.LoggedIn)?.let { _ui.value = it.copy(relayRunning = true) }
     }
 
+    /** Stop serving tickets — shuts the loopback relay down until the user starts an app again. */
+    fun stopRelay() {
+        LoopbackServerService.stop(appContext)
+        LogBus.log("Relay stopped")
+        (_ui.value as? UiState.LoggedIn)?.let { _ui.value = it.copy(relayRunning = false) }
+    }
+
     fun refreshLibrary() = loadLibrary()
 
     private fun loadLibrary() {

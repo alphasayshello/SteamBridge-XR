@@ -26,5 +26,6 @@ class BridgeViewModel(app: Application) : AndroidViewModel(app) {
     fun loginWithQr() = AuthController.loginWithQr()
     fun logout() = AuthController.logout()
     fun startApp(appId: Int) = AuthController.startApp(appId)
+    fun stopRelay() = AuthController.stopRelay()
     fun refreshLibrary() = AuthController.refreshLibrary()
 }

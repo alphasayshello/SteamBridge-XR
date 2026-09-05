@@ -32,6 +32,7 @@ class AppEntryActivity : ComponentActivity() {
                         onLoginQr = vm::loginWithQr,
                         onLogout = vm::logout,
                         onStartApp = vm::startApp,
+                        onStopRelay = vm::stopRelay,
                         onRefresh = vm::refreshLibrary,
                     )
                 }

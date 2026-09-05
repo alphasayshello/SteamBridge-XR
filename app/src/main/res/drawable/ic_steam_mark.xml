@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- outer ring -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M24,3 a21,21 0 1,0 0.1,0" />
+    <!-- connecting rod -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M16,32 L33,16" />
+    <!-- small node (lower-left) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,32 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <!-- gauge (upper-right) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,16 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <path
+        android:fillColor="#171A21"
+        android:pathData="M34,16 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" />
+</vector>

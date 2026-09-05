@@ -36,6 +36,11 @@ class TokenStore private constructor(private val prefs: SharedPreferences) {
         get() = prefs.getString(KEY_STEAMID, null)
         set(v) = prefs.edit().putStringOrRemove(KEY_STEAMID, v).apply()
 
+    /** The app the relay currently mints/serves tickets for. Defaults to Pavlov Shack. */
+    var activeAppId: Int
+        get() = prefs.getInt(KEY_APP, 3504270)
+        set(v) = prefs.edit().putInt(KEY_APP, v).apply()
+
     /** Stable per-install seed for MachineId. Generated once, then constant. */
     val machineSeed: String
         get() {
@@ -73,6 +78,7 @@ class TokenStore private constructor(private val prefs: SharedPreferences) {
         private const val KEY_ACCOUNT = "account_name"
         private const val KEY_STEAMID = "steamid"
         private const val KEY_SEED = "machine_seed"
+        private const val KEY_APP = "active_appid"
 
         /**
          * Open the store, recovering from a corrupt/invalidated keystore by wiping and retrying once.

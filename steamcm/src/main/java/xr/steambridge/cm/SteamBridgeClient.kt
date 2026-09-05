@@ -6,8 +6,10 @@ import xr.steambridge.cm.logon.CmLogon
 import xr.steambridge.cm.msg.ClientHello
 import xr.steambridge.cm.msg.DeviceDetails
 import xr.steambridge.cm.msg.EMsg
+import xr.steambridge.cm.msg.GetOwnedGames
 import xr.steambridge.cm.msg.MachineId
 import xr.steambridge.cm.msg.MessageRouter
+import xr.steambridge.cm.msg.OwnedGame
 import xr.steambridge.cm.net.CmConnection
 import xr.steambridge.cm.net.CmServerList
 import xr.steambridge.cm.ticket.AppTicketService
@@ -86,24 +88,31 @@ class SteamBridgeClient(
     }
 
     /**
-     * Silent mint: connect (if needed), log on with the stored refresh_token, request the ticket.
-     * @throws IllegalStateException on logon failure (token expired -> re-auth) or ticket failure.
+     * Silent mint for a specific app: connect, log on with the stored refresh_token, request the ticket.
+     * @throws IllegalStateException on logon failure (token expired) or ticket failure (e.g. eresult 15
+     *         AccessDenied when the account doesn't own [appId]).
      */
-    suspend fun mintWithToken(accountName: String, refreshToken: String): MintResult {
+    suspend fun mintWithToken(accountName: String, refreshToken: String, appId: Int): MintResult {
+        val r = loggedOn(accountName, refreshToken)
+        val ticket = AppTicketService(r, onLog).request(appId)
+        return MintResult(steamId64 = r.steamId.toULong(), personaName = accountName, ticket = ticket.bytes)
+    }
+
+    /** Log on and pull the signed-in account's owned games (Steam library). */
+    suspend fun fetchLibrary(accountName: String, refreshToken: String): List<OwnedGame> {
+        val r = loggedOn(accountName, refreshToken)
+        val resp = r.serviceCall(GetOwnedGames.METHOD, GetOwnedGames.request(r.steamId), authed = true)
+        val games = GetOwnedGames.parse(resp.bodyBytes)
+        onLog("library: ${games.size} owned games")
+        return games
+    }
+
+    private suspend fun loggedOn(accountName: String, refreshToken: String): MessageRouter {
         val r = router ?: connect()
-        val logon = CmLogon(r, onLog)
-        val res = logon.logon(scope, accountName, refreshToken, machineId)
-        if (!res.ok) {
-            throw IllegalStateException("logon failed eresult=${res.eResult} (token may be expired)")
-        }
-        val ticket = AppTicketService(r, onLog).request()
-        // Persona-name fetch over the CM is a later nicety; account name is a valid, non-empty NAME
-        // that satisfies the shim's null-persona guard.
-        return MintResult(
-            steamId64 = res.steamId.toULong(),
-            personaName = accountName,
-            ticket = ticket.bytes,
-        )
+        val res = CmLogon(r, onLog).logon(scope, accountName, refreshToken, machineId)
+        if (!res.ok) throw IllegalStateException("logon failed eresult=${res.eResult} (token may be expired)")
+        r.steamId = res.steamId
+        return r
     }
 
     fun close() {

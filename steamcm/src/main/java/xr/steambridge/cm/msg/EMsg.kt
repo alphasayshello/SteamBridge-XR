@@ -23,9 +23,11 @@ object EMsg {
      */
     const val ClientHello = 9805
 
-    // --- unified-messages (IAuthenticationService et al.) ---
+    // --- unified-messages (IAuthenticationService, IPlayerService et al.) ---
     /** Client -> CM service call before logon (auth lives here). Reply arrives as [ServiceMethodResponse]. */
     const val ServiceMethodCallFromClientNonAuthed = 9804
+    /** Client -> CM service call AFTER logon (e.g. Player.GetOwnedGames). Same reply EMsg. */
+    const val ServiceMethodCallFromClient = 151
     const val ServiceMethodResponse = 147
 
     // --- logon ---

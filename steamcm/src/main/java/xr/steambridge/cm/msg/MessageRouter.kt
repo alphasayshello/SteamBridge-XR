@@ -43,16 +43,17 @@ class MessageRouter(
      * @param methodName e.g. "Authentication.GetPasswordRSAPublicKey#1"
      * @param body serialized request protobuf bytes
      */
-    suspend fun serviceCall(methodName: String, body: ByteArray): SteamPacket {
+    suspend fun serviceCall(methodName: String, body: ByteArray, authed: Boolean = false): SteamPacket {
         val jobId = jobCounter.getAndIncrement()
         val header = ProtoHeader(
             steamId = steamId,
             clientSessionId = sessionId,
             jobIdSource = jobId,
             targetJobName = methodName,
-            realm = 1, // the CM requires realm=1 to route a pre-logon NonAuthed service call
+            realm = 1,
         )
-        val eMsg = EMsg.ServiceMethodCallFromClientNonAuthed
+        // Pre-logon auth RPCs go out NonAuthed (9804); post-logon RPCs (Player.*) as FromClient (151).
+        val eMsg = if (authed) EMsg.ServiceMethodCallFromClient else EMsg.ServiceMethodCallFromClientNonAuthed
         val deferred = CompletableDeferred<SteamPacket>()
         pending[jobId] = deferred
         val packet = SteamPacket(eMsg, header.encode(), body).encode()

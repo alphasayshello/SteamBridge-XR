@@ -20,11 +20,19 @@ class AppEntryActivity : ComponentActivity() {
                 Surface {
                     val state by vm.ui.collectAsState()
                     val logs by vm.logs.collectAsState()
+                    val library by vm.library.collectAsState()
+                    val libraryLoading by vm.libraryLoading.collectAsState()
+                    val activeAppId by vm.activeAppId.collectAsState()
                     BridgeScreen(
                         state = state,
                         logs = logs,
+                        library = library,
+                        libraryLoading = libraryLoading,
+                        activeAppId = activeAppId,
                         onLoginQr = vm::loginWithQr,
                         onLogout = vm::logout,
+                        onStartApp = vm::startApp,
+                        onRefresh = vm::refreshLibrary,
                     )
                 }
             }

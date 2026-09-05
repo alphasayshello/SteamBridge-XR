@@ -3,6 +3,7 @@ package xr.steambridge
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.StateFlow
+import xr.steambridge.cm.msg.OwnedGame
 
 sealed interface UiState {
     data class LoggedOut(val error: String? = null) : UiState
@@ -18,8 +19,12 @@ class BridgeViewModel(app: Application) : AndroidViewModel(app) {
 
     val ui: StateFlow<UiState> = AuthController.ui
     val logs: StateFlow<List<String>> = LogBus.lines
+    val library: StateFlow<List<OwnedGame>> = AuthController.library
+    val libraryLoading: StateFlow<Boolean> = AuthController.libraryLoading
+    val activeAppId: StateFlow<Int> = AuthController.activeAppId
 
     fun loginWithQr() = AuthController.loginWithQr()
     fun logout() = AuthController.logout()
-    fun startRelay() = AuthController.startRelay()
+    fun startApp(appId: Int) = AuthController.startApp(appId)
+    fun refreshLibrary() = AuthController.refreshLibrary()
 }

@@ -13,6 +13,7 @@ activityCompose = "1.9.2"
 lifecycle = "2.8.6"
 coreKtx = "1.13.1"
 junit = "4.13.2"
+coil = "2.7.0"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -22,6 +23,7 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
 protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }

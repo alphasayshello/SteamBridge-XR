@@ -3,6 +3,7 @@ package xr.steambridge
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import xr.steambridge.cm.SteamBridgeClient
+import xr.steambridge.cm.msg.OwnedGame
 import xr.steambridge.secure.TokenStore
 import xr.steambridge.delivery.TicketCache
 
@@ -26,9 +27,10 @@ class BridgeRepository(
             LogBus.log("No saved session — sign in first")
             return null
         }
+        val appId = tokens.activeAppId
         val client = SteamBridgeClient(scope = scope, machineSeed = tokens.machineSeed, onLog = LogBus::log)
         return try {
-            val result = client.mintWithToken(account, refresh)
+            val result = client.mintWithToken(account, refresh, appId)
             tokens.steamId64 = result.steamId64.toString()
             TicketCache.Entry(
                 steamId64 = result.steamId64,
@@ -38,6 +40,22 @@ class BridgeRepository(
             )
         } catch (e: Exception) {
             LogBus.log("Mint failed: ${e.message}")
+            null
+        } finally {
+            client.close()
+        }
+    }
+
+    /** Pull the signed-in account's owned games. Null on failure. */
+    suspend fun fetchLibrary(): List<OwnedGame>? {
+        val account = tokens.accountName
+        val refresh = tokens.refreshToken
+        if (account.isNullOrEmpty() || refresh.isNullOrEmpty()) return null
+        val client = SteamBridgeClient(scope = scope, machineSeed = tokens.machineSeed, onLog = LogBus::log)
+        return try {
+            client.fetchLibrary(account, refresh)
+        } catch (e: Exception) {
+            LogBus.log("Library fetch failed: ${e.message}")
             null
         } finally {
             client.close()

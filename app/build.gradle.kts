@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.lifecycle.service)
     implementation(libs.activity.compose)
     implementation(libs.zxing.core)
+    implementation(libs.coil.compose)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

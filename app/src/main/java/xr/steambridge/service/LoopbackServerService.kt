@@ -30,6 +30,7 @@ class LoopbackServerService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var repo: BridgeRepository
     private lateinit var server: LoopbackTicketServer
+    private var running = false
 
     override fun onCreate() {
         super.onCreate()
@@ -44,8 +45,18 @@ class LoopbackServerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIF_ID, buildNotification())
-        server.start(scope)
-        startWarmer()
+        if (!running) {
+            server.start(scope)
+            startWarmer()
+            running = true
+        }
+        if (intent?.action == ACTION_SWITCH_APP) {
+            // Active app changed: drop the old app's cached ticket and mint the new one right away.
+            scope.launch {
+                repo.cache.clear()
+                repo.cache.get { repo.mintTicket() }
+            }
+        }
         return START_STICKY
     }
 
@@ -64,6 +75,7 @@ class LoopbackServerService : Service() {
     }
 
     override fun onDestroy() {
+        running = false
         server.stop()
         scope.cancel()
         super.onDestroy()
@@ -92,8 +104,18 @@ class LoopbackServerService : Service() {
         private const val WARM_INTERVAL_MS = 75_000L // refresh ahead of the 90s cache TTL
         const val PORT = 48010
 
+        private const val ACTION_SWITCH_APP = "xr.steambridge.SWITCH_APP"
+
         fun start(context: Context) {
-            val intent = Intent(context, LoopbackServerService::class.java)
+            context.startForegroundService(Intent(context, LoopbackServerService::class.java))
+        }
+
+        /** Tell the running relay the active app changed — clears the cache and mints the new ticket. */
+        fun switchApp(context: Context, appId: Int) {
+            val intent = Intent(context, LoopbackServerService::class.java).apply {
+                action = ACTION_SWITCH_APP
+                putExtra("appId", appId)
+            }
             context.startForegroundService(intent)
         }
 
